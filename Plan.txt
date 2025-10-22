@@ -1,0 +1,276 @@
+Perfekt — cooler Projektauftrag. Ich mache dir jetzt einen kompletten, praxis-orientierten Plan **Schritt für Schritt**, inkl. empfohlener (kostenloser) Dienste, Dateistruktur, Beispielcode-Snippets (Python), Test-/Deployment-optionen und wie du das modular aufbaust. Ich habe die wichtigsten Fakten geprüft und belege sie mit Quellen.
+
+---
+
+# 1) Kurzüberblick / Architektur (Zielbild)
+
+Ein modularer Personal-AI-Assistent mit diesen Bausteinen:
+
+* **Bot-Interface** (Telegram zuerst) — empfängt Text/Sprach, antwortet.
+* **LLM-Adapter** — verbindet zu einem kostenlosen/OSS LLM-Anbieter (z.B. Hugging Face Inference / OpenRouter) und kapselt Model-Calls.
+* **Kalender-Client** — Google Calendar OAuth + CRUD für Events.
+* **Sprache** — STT (lokal: whisper.cpp oder VOSK) + TTS (z.B. gTTS / Coqui TTS lokal).
+* **Kontext- / Session-Speicher** — lokal JSON oder SQLite (keine Cloud).
+* **Orchestrator / Worker** — verarbeitet Befehle, Regeln zur Intent-Erkennung, Dispatcher.
+* **Hosting** — lokal möglich; kostenlos online z.B. Replit / Render / Vercel / Railway (je nach Feature). ([huggingface.co][1])
+
+---
+
+# 2) Empfehlungen zu kostenlosen APIs / Tools (Kurz)
+
+* **LLM / Inference**:
+
+  * *Hugging Face Inference Providers* — bietet kostenlosen Einstieg / Credits für persönliche Nutzung; gut für private Projekte. ([huggingface.co][1])
+  * *OpenRouter* — Gateway zu vielen Modellen (OpenAI/Anthropic/Community-Modelle), praktikabel für Experimentieren mit einer einheitlichen API. ([OpenRouter][2])
+* **Telegram**: python-telegram-bot (async, stabil, weit verbreitet). ([docs.python-telegram-bot.org][3])
+* **Kalender**: Google Calendar API (OAuth2, kostenlos nutzbar für persönliche Accounts; Quickstart & Bibliotheken für Python vorhanden). ([Google for Developers][4])
+* **Speech-to-Text (offline / kostenlos)**: *whisper.cpp* (hochperformant, lokal, Apple Silicon optimiert) oder *VOSK* für Low-resource/Embed-Devices. Beide laufen lokal, ohne API-Kosten. ([GitHub][5])
+* **TTS**: gTTS (Google Text-to-Speech wrapper, einfach), Coqui TTS (Open Source lokal). (ggf. evaluiere Qualität vs. Einfachheit)
+* **Hosting (kostenlos für MVP)**: Replit, Render free, Vercel/Railway (je nach Anforderungen Hintergrund-Worker vs. statisch). Beachte Limits. ([northflank.com][6])
+
+---
+
+# 3) Schritt-für-Schritt Plan (MVP in 6 Phasen)
+
+## Phase 0 — Vorbereitung (30–60 min)
+
+* Lokale Umgebung: Python 3.10+, venv, git.
+* Erstelle Projekt-Repo.
+
+## Phase 1 — Minimaler Telegram Bot (Text) (1–2 h)
+
+* Ziel: Bot empfängt Text und sendet einfache Antworten (ECHO).
+* Lib: `python-telegram-bot`.
+* Test lokal mit ngrok (falls notwendig) oder Polling.
+
+## Phase 2 — LLM-Adapter integrieren (2–4 h)
+
+* Ziel: Bot antwortet mit LLM-Antworten. Implementiere Adapter-Interface (z.B. `ai_client.py`) das z. B. Hugging Face oder OpenRouter anspricht.
+* Beginne mit kostenlosen HF Inference Provider oder OpenRouter-Key.
+
+## Phase 3 — Google Calendar Integration (2–4 h)
+
+* OAuth2 Setup, `calendar_client.py` mit Funktionen: `list_events(day)`, `create_event()`, `delete_event()`.
+* Add: Natural Language → structured time (z.B. dateparser / parsedatetime).
+
+## Phase 4 — Sprache hinzufügen (STT + optional TTS) (2–6 h)
+
+* Für STT lokal: whisper.cpp (fast, offline) oder VOSK; implementiere `speech_to_text()`-Wrapper.
+* TTS: gTTS → MP3 → send via Telegram voice/message.
+
+## Phase 5 — Context & Intents (2–6 h)
+
+* Simple rule-based intent detection (regex) + fallback to LLM for NLU.
+* Persistiere recent context per user in local SQLite/JSON.
+
+## Phase 6 — Deployment & Extras (variable)
+
+* Deploy minimal bot to Replit/Render; set up webhooks if resource allows.
+* Add Siri Shortcuts (optional): expose small HTTP endpoint + use Shortcuts to call it.
+
+---
+
+# 4) Projektdatei- und Verzeichnisstruktur (empfohlen)
+
+```
+personal-ai-assistant/
+├─ README.md
+├─ .env               # API keys, secrets (nicht ins Repo!)
+├─ requirements.txt
+├─ src/
+│  ├─ main.py         # Startpunkt / Orchestrator
+│  ├─ bot/
+│  │  ├─ telegram_bot.py
+│  │  └─ handlers.py
+│  ├─ ai/
+│  │  ├─ ai_client.py       # abstrakte Klasse + implementations (HF, OpenRouter)
+│  │  └─ hf_provider.py
+│  ├─ calendar/
+│  │  └─ calendar_client.py
+│  ├─ speech/
+│  │  ├─ stt_whisper.py
+│  │  └─ stt_vosk.py
+│  ├─ storage/
+│  │  └─ store.py           # SQLite/JSON wrapper
+│  └─ utils/
+│     └─ nlp_utils.py       # date parsing, intent matchers
+└─ tests/
+   └─ ...
+```
+
+---
+
+# 5) Wichtige Beispiel-Dateien / Code-Snippets (Python)
+
+> Hinweis: Das sind minimal lauffähige Beispiele — passe Keys/ENV an.
+
+## `requirements.txt`
+
+```
+python-telegram-bot>=23.0
+requests
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+python-dateutil
+python-dotenv
+sqlite-utils
+vosk
+# whisper.cpp läuft lokal (separate install/compilation) — nutzt CLI oder Python wrapper
+```
+
+## `src/bot/telegram_bot.py` — minimaler Start (Polling)
+
+```python
+import os
+from dotenv import load_dotenv
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+
+load_dotenv()
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Hi — ich bin dein persönlicher Assistent. Frag mich was!")
+
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    # hier würde dispatcher die Intents/AI aufrufen
+    await update.message.reply_text(f"ECHO: {text}")
+
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    app.run_polling()
+```
+
+(Die `python-telegram-bot`-Docs sind die Referenz.) ([docs.python-telegram-bot.org][3])
+
+## `src/ai/hf_provider.py` — Hugging Face Inference (Beispiel)
+
+```python
+import os, requests
+HF_API = os.getenv("HF_API_TOKEN")
+
+def hf_generate(prompt, model="gpt2"):
+    url = f"https://api-inference.huggingface.co/models/{model}"
+    headers = {"Authorization": f"Bearer {HF_API}"}
+    data = {"inputs": prompt, "options":{"wait_for_model":True}}
+    r = requests.post(url, json=data, headers=headers, timeout=30)
+    r.raise_for_status()
+    res = r.json()
+    # response parsing varies by model
+    return res[0].get("generated_text") if isinstance(res, list) else str(res)
+```
+
+(HF bietet eine Inference free tier / credits für Einstieg.) ([huggingface.co][1])
+
+## `src/calendar/calendar_client.py` — Google Calendar Quickstart (Skizze)
+
+Verwende Google quickstart-flow; in Kurzform:
+
+```python
+# siehe Google Calendar quickstart: use google-auth-oauthlib.flow.InstalledAppFlow
+# oauth2 flow, save token.json, then use googleapiclient.discovery.build('calendar','v3', credentials=creds)
+# Funktionen: list_events(date), create_event(summary, start_dt, end_dt), delete_event(event_id)
+```
+
+(Die Google-Docs Quickstart beschreibt Schritt für Schritt die Einrichtung und Bibliotheken.) ([Google for Developers][4])
+
+## STT: whisper.cpp (lokal)
+
+* Installiere whisper.cpp (C++) und rufe das Binary aus Python (subprocess) oder nutze python bindings. whisper.cpp ermöglicht Offline-ASR, sehr praktisch lokal. ([GitHub][5])
+
+## STT: VOSK (Python)
+
+```python
+from vosk import Model, KaldiRecognizer
+import sys, json, wave
+
+model = Model("model-path")  # lade passende Sprache
+# dann Audio einlesen und transcribe
+```
+
+(VOSK ist offline und unterstützt viele Sprachen.) ([alphacephei.com][7])
+
+---
+
+# 6) Modulares Testen / Vorgehen beim Entwickeln
+
+* **Modul-Weg:** Implementiere Schrittweise und teste jede Komponente isoliert:
+
+  1. `telegram_bot.py` mit echo.
+  2. `hf_provider.py` → test via small script `python -c "from ai.hf_provider import hf_generate; print(hf_generate('Hello'))"`.
+  3. `calendar_client.py` → führe quickstart aus, prüfe `list_events`.
+  4. `speech` → teste STT mit sample WAV.
+* **Integration:** erst LLM + Telegram, dann Calendar Befehle (intent mapping), dann STT/TTS.
+* **Logging & Fehlerbehandlung**: logge API errors, rate limits.
+
+---
+
+# 7) Deployment (lokal & kostenlos online)
+
+* **Lokal**: venv, run `python src/bot/telegram_bot.py`. Für webhook-Tests: nutze `ngrok` (kostenlose Stufe) oder Polling (einfacher).
+* **Replit**: Einfacher Upload; setze ENV variables im Replit secret store. Eignet sich sehr gut für MVP (kostenfreie Stunden, aber restriktionen).
+* **Render / Railway / Vercel**: Render/Railway bieten kostenlose Starter-Instanzen; wenn du Webhooks brauchst, setze HTTPS endpoints. Achte auf „sleep“/idle timeout und monatliche Stundenlimits. ([northflank.com][6])
+
+---
+
+# 8) Sicherheit, Datenschutz & Kostenfallen
+
+* **API-Keys** in `.env` und niemals ins Repo.
+* **Google OAuth**: Beim Release als Nutzer-App muss man ggf. das OAuth-Consent Verifizierungsverfahren kennen (bei öffentlicher Nutzung).
+* **Quotas**: Free tiers haben Rate Limits; für produktive Nutzung kann Kosten anfallen — überwache Usage. (HF / OpenRouter haben unterschiedliche Gratiskontingente). ([huggingface.co][1])
+
+---
+
+# 9) Erweiterungen (Roadmap)
+
+* Siri Shortcuts: expose small HTTPS endpoint (auth) und erstelle Shortcut, der POSTs mit JSON sendet.
+* Multi-platform: Add Telegram → Discord adapter (separate bot).
+* Smart Home: implementiere Home Assistant integrations later.
+* Local vector DB for memory: e.g. `sqlite + FAISS` (später).
+
+---
+
+# 10) Quickstart Checkliste (so legst du los, Schritt für Schritt)
+
+1. Repo erstellen + `python -m venv venv` + `pip install -r requirements.txt`.
+2. Telegram Bot erstellen (BotFather) → `TELEGRAM_BOT_TOKEN` in `.env`.
+3. Test: `python src/bot/telegram_bot.py` → `/start` → `/echo`.
+4. Hugging Face / OpenRouter Key besorgen (kostenfrei Account anlegen) → `HF_API_TOKEN` / `OPENROUTER_KEY`.
+5. Implementiere `ai/hf_provider.py` und teste `hf_generate()`.
+6. Google Cloud Console: Calendar API aktivieren, `credentials.json` erzeugen, quickstart ausführen und `token.json` erstellen.
+7. STT lokal testen (whisper.cpp oder VOSK).
+8. Verbindung: Bot → Intent → Calendar/LLM → Antwort.
+
+(Bei Bedarf schreibe ich dir jetzt die vollständigen Implementierungen für `ai_client.py`, `calendar_client.py` und `telegram_bot.py` — sag mir ob du Python bevorzugst; ich habe bereits Python-Beispiele oben.)
+
+---
+
+# 11) Wichtige Quellen (Kurz)
+
+* Hugging Face Inference Providers (free-tier info). ([huggingface.co][1])
+* OpenRouter (unified API, routing, free/community models). ([OpenRouter][2])
+* Google Calendar API — Python Quickstart. ([Google for Developers][4])
+* python-telegram-bot docs / GitHub. ([docs.python-telegram-bot.org][3])
+* whisper.cpp (offline Whisper implementation) & VOSK offline speech. ([GitHub][5])
+* Free hosting / Render / Replit notes. ([northflank.com][6])
+
+---
+
+Wenn du willst, mache ich als Nächstes **einen vollständigen Starter-Repo-Commit**:
+
+* mit `requirements.txt`, `.env.example`, `src/bot/telegram_bot.py`, `src/ai/hf_provider.py`, `src/calendar/calendar_client.py` (Quickstart skeleton) und einer README mit Deploy-Schritten.
+  Sag mir: **möchtest du das in Python** (empfohlen) — dann generiere ich die Dateien komplett (du kannst sie sofort kopieren).
+
+Welche Datei willst du zuerst? Soll ich direkt die vollständigen Implementierungen (inkl. Google Calendar OAuth-Flow und HF/OpenRouter-Adapter) in den Chat liefern?
+
+[1]: https://huggingface.co/docs/inference-providers/en/index?utm_source=chatgpt.com "Inference Providers"
+[2]: https://openrouter.ai/?utm_source=chatgpt.com "OpenRouter"
+[3]: https://docs.python-telegram-bot.org/?utm_source=chatgpt.com "python-telegram-bot v22.5"
+[4]: https://developers.google.com/workspace/calendar/api/quickstart/python?utm_source=chatgpt.com "Python quickstart | Google Calendar"
+[5]: https://github.com/ggml-org/whisper.cpp?utm_source=chatgpt.com "ggml-org/whisper.cpp"
+[6]: https://northflank.com/blog/render-alternatives?utm_source=chatgpt.com "7 Best Render alternatives for simple app hosting in 2025"
+[7]: https://alphacephei.com/vosk/?utm_source=chatgpt.com "VOSK Offline Speech Recognition API"

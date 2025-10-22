@@ -1,0 +1,31 @@
+# Telegram Bot
+python-telegram-bot==12.8
+
+# Google APIs
+google-api-python-client==2.50.0
+google-auth-oauthlib==0.5.0
+google-auth-httplib2==0.1.0
+
+# HTTP & API Requests
+requests
+
+# Environment Variables
+python-dotenv
+
+# Date & Time Parsing
+dateparser
+
+# Database & Storage
+sqlite-utils
+
+# Speech-to-Text (optional - install wenn benötigt)
+# vosk==0.3.45
+
+# Text-to-Speech
+gTTS
+
+# NLP Utilities
+python-dateutil
+
+# Logging & Utils
+colorama

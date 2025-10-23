@@ -15,6 +15,11 @@ from telegram.ext import (
     CallbackContext
 )
 
+# AI Integration
+from src.ai.hf_provider import HuggingFaceProvider
+from src.ai.openrouter_provider import OpenRouterProvider
+from src.utils.nlp_utils import detect_command_type
+
 # Logging konfigurieren
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -28,15 +33,42 @@ class AdonisBot:
     Hauptklasse für den AdonisAI Telegram Bot
     """
     
-    def __init__(self, token: str):
+    def __init__(self, token: str, use_ai: bool = True):
         """
         Initialisiert den Bot mit dem Telegram Token
         
         Args:
             token: Telegram Bot API Token
+            use_ai: Ob AI-Provider verwendet werden sollen
         """
         self.token = token
         self.updater: Optional[Updater] = None
+        self.use_ai = use_ai
+        self.ai_provider = None
+        
+        # Initialisiere AI Provider wenn gewünscht
+        if self.use_ai:
+            self._init_ai_provider()
+    
+    def _init_ai_provider(self):
+        """Initialisiert den AI Provider"""
+        try:
+            # Prüfe welcher Provider verfügbar ist
+            provider_type = os.getenv('AI_PROVIDER', 'huggingface').lower()
+            
+            if provider_type == 'openrouter' and os.getenv('OPENROUTER_API_KEY'):
+                logger.info("🌐 Verwende OpenRouter Provider")
+                self.ai_provider = OpenRouterProvider()
+            else:
+                logger.info("🤖 Verwende Hugging Face Provider")
+                self.ai_provider = HuggingFaceProvider()
+            
+            logger.info("✅ AI Provider initialisiert")
+            
+        except Exception as e:
+            logger.warning(f"⚠️  AI Provider konnte nicht initialisiert werden: {e}")
+            logger.info("ℹ️  Bot läuft im Echo-Modus")
+            self.ai_provider = None
         
     def start_command(self, update: Update, context: CallbackContext) -> None:
         """
@@ -119,13 +151,44 @@ class AdonisBot:
         
         logger.info(f"Nachricht von {user.id} ({user.username}): {message_text}")
         
-        # Einfache Echo-Funktion als Platzhalter
-        # TODO: Hier wird später die KI-Integration erfolgen
-        response = (
-            f"Du hast geschrieben: *{message_text}*\n\n"
-            "🚧 Die KI-Integration ist noch in Entwicklung.\n"
-            "Bald kann ich intelligente Antworten geben!"
-        )
+        # Erkenne Command-Type
+        command_type = detect_command_type(message_text)
+        logger.info(f"Command-Type erkannt: {command_type}")
+        
+        # Wenn AI verfügbar ist, nutze sie
+        if self.ai_provider:
+            try:
+                # Async-Wrapper für synchronen Handler
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Generiere AI-Antwort
+                response = loop.run_until_complete(
+                    self.ai_provider.generate_response(message_text)
+                )
+                loop.close()
+                
+                # Füge Command-Type Info hinzu
+                if command_type == 'calendar':
+                    response = f"📅 *Kalender-Anfrage erkannt*\n\n{response}\n\n_Hinweis: Kalender-Integration kommt in Phase 3_"
+                elif command_type == 'reminder':
+                    response = f"⏰ *Erinnerung erkannt*\n\n{response}\n\n_Hinweis: Erinnerungen kommen in Phase 5_"
+                
+            except Exception as e:
+                logger.error(f"Fehler bei AI-Verarbeitung: {e}")
+                response = (
+                    "⚠️ AI-Verarbeitung fehlgeschlagen.\n\n"
+                    f"Du hast geschrieben: *{message_text}*\n\n"
+                    "Bitte versuche es später erneut."
+                )
+        else:
+            # Fallback: Echo-Modus
+            response = (
+                f"Du hast geschrieben: *{message_text}*\n\n"
+                "🚧 Die KI-Integration ist noch in Entwicklung.\n"
+                "Bald kann ich intelligente Antworten geben!"
+            )
         
         update.message.reply_text(response, parse_mode='Markdown')
     

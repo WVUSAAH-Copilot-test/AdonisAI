@@ -12,7 +12,7 @@
 |-------|--------|--------------|---------|
 | **Phase 0** | ✅ Abgeschlossen | Vorbereitung & Setup | Projekt-Repo, Python-Umgebung, Git |
 | **Phase 1** | ✅ Abgeschlossen | Minimaler Telegram Bot | Text-Handler, Commands, Logging |
-| **Phase 2** | 🔄 Vorbereitet | LLM-Adapter Integration | HF/OpenRouter Module angelegt |
+| **Phase 2** | ✅ Abgeschlossen | LLM-Adapter Integration | HF/OpenRouter implementiert & getestet |
 | **Phase 3** | 📋 Geplant | Google Calendar | OAuth & Event-Management |
 | **Phase 4** | 📋 Geplant | Speech (STT/TTS) | Vosk/Whisper + gTTS |
 | **Phase 5** | 📋 Geplant | Context & Intents | NLU & Session-Storage |
@@ -20,16 +20,42 @@
 
 ---
 
-## ✅ Was funktioniert (Phase 1)
+## ✅ Was funktioniert (Phase 1 + 2)
 
 ### Telegram Bot
 - [x] `/start` - Willkommensnachricht
 - [x] `/help` - Hilfe-Übersicht  
 - [x] `/info` - Bot-Informationen
-- [x] Text-Nachrichten empfangen und Echo-Antwort
+- [x] Text-Nachrichten empfangen und verarbeiten
 - [x] Voice-Nachrichten erkennen (Handler bereit)
 - [x] Error Handling & Logging
 - [x] Modular strukturiert
+
+### AI-Integration (Phase 2 ✅)
+- [x] **Hugging Face Provider**
+  - Text-Generierung mit flan-t5-base
+  - Intent-Erkennung
+  - Funktioniert ohne API-Token (limitiert)
+- [x] **OpenRouter Provider** 
+  - Multi-Model-Support (GPT-3.5, Claude, Mistral)
+  - Chat-Konversationen
+  - Intent-Analyse
+  - **Getestet & funktionsfähig** ✅
+- [x] **Bot-Integration**
+  - Automatische Provider-Auswahl
+  - AI-gestützte Antworten
+  - Command-Type Detection (calendar, reminder, question)
+  - Fallback zu Echo-Modus bei Fehler
+
+### AI-Integration (✨ NEU in Phase 2)
+- [x] Hugging Face Provider vollständig implementiert
+- [x] OpenRouter Provider vollständig implementiert
+- [x] Intelligente Antwort-Generierung
+- [x] Intent-Erkennung (calendar, reminder, question, general)
+- [x] Kontext-aware Responses
+- [x] Fehlerbehandlung & Fallbacks
+- [x] Test-Suite für AI-Provider
+- [x] SSL-Workarounds integriert
 
 ### Projekt-Setup
 - [x] Vollständige Verzeichnisstruktur
@@ -71,31 +97,30 @@ urllib3 HTTPError [SSL: CERTIFICATE_VERIFY_FAILED]
 
 ---
 
-## 🎯 Nächste Schritte (Phase 2)
+## 🎯 Nächste Schritte (Phase 3)
 
-### LLM-Integration
-1. **Hugging Face API testen**
-   - Token besorgen (https://huggingface.co/settings/tokens)
-   - `hf_provider.py` implementieren
-   - Test mit kleinem Modell (gpt2/mistral)
+### Google Calendar Integration
+1. **OAuth2 Setup**
+   - Google Cloud Console Projekt erstellen
+   - Calendar API aktivieren
+   - credentials.json generieren
 
-2. **OpenRouter Alternative**
-   - API-Key von openrouter.ai
-   - `openrouter_provider.py` implementieren
-   - Gateway zu verschiedenen Modellen
+2. **Calendar Client implementieren**
+   - Event-Listing (heute, morgen, Woche)
+   - Event-Erstellung via Natural Language
+   - Event-Löschen/Bearbeiten
 
-3. **Bot + AI verbinden**
-   - Intent-Erkennung
-   - Context-aware Antworten
-   - Fallback zu Echo bei Fehler
+3. **Bot-Integration**
+   - Calendar-Intent → Calendar-Action
+   - Date-Parsing verbessern
+   - Bestätigungsdialoge
 
 ### Tasks
-- [ ] HF_API_TOKEN in .env hinzufügen
-- [ ] `src/ai/hf_provider.py` vollständig implementieren
-- [ ] `src/ai/openrouter_provider.py` vollständig implementieren
-- [ ] Telegram Bot mit AI-Client verbinden
-- [ ] Intent-Erkennung für Befehle (calendar, reminder, question, general)
-- [ ] Tests schreiben für AI-Provider
+- [ ] Google Cloud Projekt einrichten
+- [ ] `src/gcalendar/calendar_client.py` vollständig implementieren
+- [ ] Natural Language → DateTime Parsing
+- [ ] Bot Commands für Calendar erweitern
+- [ ] Tests für Calendar Client
 
 ---
 

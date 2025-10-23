@@ -2,6 +2,79 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.2.0] - 2025-10-22
+
+### Added - Phase 2 Abgeschlossen ✅
+
+#### AI-Integration
+- **src/ai/hf_provider.py**: Vollständige Hugging Face Implementation
+  - Text-Generierung mit mehreren Modellen (flan-t5-base, mistral, gpt2)
+  - Intent-Erkennung und Klassifikation
+  - Konfigurierbare Parameter (temperature, max_length)
+  - Error-Handling & Logging
+  - Funktioniert ohne API-Token (limitiert)
+
+- **src/ai/openrouter_provider.py**: OpenRouter Gateway
+  - Multi-Model-Support (GPT-3.5, Claude, Mistral, PaLM)
+  - Chat-Format mit Message-Historie
+  - System-Prompts & Context
+  - Intent-Analyse
+  - **Getestet und funktionsfähig** ✅
+
+- **src/ai/ai_client.py**: Erweitert mit besserer Dokumentation
+
+#### Bot-Integration
+- **src/bot/telegram_bot.py**: AI-Provider Integration
+  - Automatische Provider-Wahl (HuggingFace/OpenRouter)
+  - AI-gestützte Antworten auf Benutzer-Nachrichten
+  - Command-Type Detection (calendar, reminder, question, general)
+  - Graceful Fallback bei AI-Fehlern
+  - Async-Wrapper für synchrone Handler
+
+#### Testing
+- **tests/test_ai_providers.py**: Umfangreiche Tests
+  - HuggingFace Provider Tests
+  - OpenRouter Provider Tests
+  - Intent-Erkennung Tests
+  - Context & Parameter Tests
+  - SSL-Workaround integriert
+
+#### Dokumentation
+- **docs/PHASE2.md**: Phase 2 Dokumentation
+  - Setup-Anleitung für AI-Provider
+  - API-Keys besorgen
+  - Modell-Auswahl & Konfiguration
+  - Beispiele & Best Practices
+
+#### Konfiguration
+- `.env.example` aktualisiert mit AI-Provider Settings
+- OpenRouter API-Key integriert
+- Empfohlener Provider: OpenRouter
+
+### Changed
+- Bot verwendet jetzt standardmäßig AI statt Echo
+- Intelligente Antworten auf alle Nachrichten
+- Bessere Error-Messages mit Fallback
+
+### Technical Details
+- Beide Provider mit async/await
+- Python 3.6 kompatibel (asyncio.get_event_loop statt asyncio.run)
+- Requests mit SSL-Workaround für Firmennetzwerke
+- Modular & erweiterbar
+
+### Testing Results
+- ✅ OpenRouter: Funktioniert einwandfrei
+- ⚠️ HuggingFace: Funktioniert (Rate-Limits ohne Token)
+- ✅ Bot-Integration: Erfolgreich getestet
+
+### Next Steps (Phase 3)
+- [ ] Google Calendar OAuth2 Setup
+- [ ] Event CRUD Implementierung
+- [ ] Natural Language Date Parsing
+- [ ] Calendar Commands im Bot
+
+---
+
 ## [0.1.0] - 2025-10-22
 
 ### Added - Phase 1 Abgeschlossen ✅

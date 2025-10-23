@@ -4,9 +4,11 @@ Verwaltet die Telegram Bot Logik und Nachrichtenverarbeitung
 """
 
 import os
+import sys
 import logging
 from typing import Optional
 from datetime import datetime, timedelta
+from functools import wraps
 from telegram import Update
 from telegram.ext import (
     Updater,
@@ -33,6 +35,44 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+
+def admin_only(func):
+    """
+    Decorator für Admin-only Commands
+    Prüft ob User die ADMIN_USER_ID aus .env hat
+    """
+    @wraps(func)
+    def wrapper(self, update: Update, context: CallbackContext):
+        user_id = update.effective_user.id
+        admin_id = os.getenv('ADMIN_USER_ID', None)
+        
+        if admin_id is None:
+            update.message.reply_text(
+                "⚠️ ADMIN_USER_ID nicht in .env konfiguriert!\n"
+                "Füge deine User-ID hinzu (siehe /myid)"
+            )
+            logger.warning("ADMIN_USER_ID nicht konfiguriert")
+            return
+        
+        try:
+            admin_id = int(admin_id)
+        except ValueError:
+            update.message.reply_text("⚠️ ADMIN_USER_ID ist ungültig!")
+            logger.error(f"Ungültige ADMIN_USER_ID: {admin_id}")
+            return
+        
+        if user_id != admin_id:
+            update.message.reply_text(
+                "⛔ **Zugriff verweigert**\n\n"
+                "Dieser Befehl ist nur für Admins verfügbar.",
+                parse_mode='Markdown'
+            )
+            logger.warning(f"Unauthorized access attempt by user {user_id}")
+            return
+        
+        return func(self, update, context)
+    return wrapper
 
 
 class AdonisBot:
@@ -113,7 +153,8 @@ class AdonisBot:
             "/start - Bot starten\n"
             "/help - Hilfe anzeigen\n"
             "/info - Bot-Informationen\n"
-            "/features - Alle Funktionen im Detail\n\n"
+            "/features - Alle Funktionen im Detail\n"
+            "/myid - Deine Telegram User-ID anzeigen\n\n"
             "📅 *Kalender:*\n"
             "/today - Termine heute\n"
             "/tomorrow - Termine morgen\n"
@@ -141,7 +182,11 @@ class AdonisBot:
             "/start - Bot starten und Übersicht\n"
             "/help - Diese Hilfe anzeigen\n"
             "/info - Bot-Informationen & Version\n"
-            "/features - Alle Funktionen im Detail\n\n"
+            "/features - Alle Funktionen im Detail\n"
+            "/myid - Deine User-ID (für Admin-Setup)\n\n"
+            
+            "**🔒 Admin-Befehle:**\n"
+            "/shutdown - Bot herunterfahren (nur Admin)\n\n"
             
             "**📅 Kalender-Befehle:**\n"
             "/today - Heutige Termine anzeigen\n"
@@ -248,6 +293,59 @@ class AdonisBot:
         )
         update.message.reply_text(features_text, parse_mode='Markdown')
         logger.info(f"Features angefordert von User: {update.effective_user.id}")
+    
+    def myid_command(self, update: Update, context: CallbackContext) -> None:
+        """
+        Handler für den /myid Befehl - Zeigt User-ID an
+        
+        Args:
+            update: Telegram Update Objekt
+            context: Callback Context
+        """
+        user = update.effective_user
+        user_id = user.id
+        username = user.username or "N/A"
+        first_name = user.first_name or "N/A"
+        
+        myid_text = (
+            f"🆔 **Deine Telegram Identität**\n\n"
+            f"**User-ID:** `{user_id}`\n"
+            f"**Username:** @{username}\n"
+            f"**Name:** {first_name}\n\n"
+            f"💡 **Für Admin-Zugriff:**\n"
+            f"Füge folgende Zeile zu `.env` hinzu:\n"
+            f"```\nADMIN_USER_ID={user_id}\n```\n\n"
+            f"Danach kannst du Admin-Befehle wie `/shutdown` nutzen."
+        )
+        update.message.reply_text(myid_text, parse_mode='Markdown')
+        logger.info(f"MyID angefordert von User: {user_id} (@{username})")
+    
+    @admin_only
+    def shutdown_command(self, update: Update, context: CallbackContext) -> None:
+        """
+        Handler für den /shutdown Befehl - Beendet den Bot (Admin only)
+        
+        Args:
+            update: Telegram Update Objekt
+            context: Callback Context
+        """
+        user = update.effective_user
+        logger.warning(f"🛑 Bot shutdown initiated by admin: {user.id} (@{user.username})")
+        
+        update.message.reply_text(
+            "🛑 **Bot wird heruntergefahren...**\n\n"
+            "Auf Wiedersehen! 👋",
+            parse_mode='Markdown'
+        )
+        
+        # Kurze Verzögerung damit die Nachricht gesendet wird
+        import time
+        time.sleep(1)
+        
+        # Bot beenden
+        logger.info("Bot wird beendet...")
+        self.updater.stop()
+        sys.exit(0)
     
     def today_command(self, update: Update, context: CallbackContext) -> None:
         """Handler für /today - Zeigt heutige Termine"""
@@ -688,6 +786,10 @@ Analysiere JETZT die GESAMTE Konversation und antworte:"""
         dispatcher.add_handler(CommandHandler("help", self.help_command))
         dispatcher.add_handler(CommandHandler("info", self.info_command))
         dispatcher.add_handler(CommandHandler("features", self.features_command))
+        dispatcher.add_handler(CommandHandler("myid", self.myid_command))
+        
+        # Command Handler - Admin
+        dispatcher.add_handler(CommandHandler("shutdown", self.shutdown_command))
         
         # Command Handler - Calendar
         dispatcher.add_handler(CommandHandler("today", self.today_command))

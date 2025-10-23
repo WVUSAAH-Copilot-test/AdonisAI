@@ -48,6 +48,10 @@ env/
 logs/
 *.log
 data/*.db
+data/*.db-journal
+data/exports/
+
+# Training Data (Privacy)
 data/*.sqlite
 data/*.sqlite3
 

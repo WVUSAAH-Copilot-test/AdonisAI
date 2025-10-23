@@ -29,6 +29,9 @@ from src.gcalendar.factory import create_calendar_provider
 # Context Management
 from src.utils.context_manager import ContextManager
 
+# Interaction Logging
+from src.storage.interaction_logger import InteractionLogger
+
 # Logging konfigurieren
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -98,6 +101,10 @@ class AdonisBot:
         
         # Context Manager für Chat-Historie
         self.context_manager = ContextManager(max_messages=10, ttl_minutes=30)
+        
+        # Interaction Logger für Personal AI Training
+        self.interaction_logger = InteractionLogger()
+        logger.info("🧠 Interaction Logging aktiviert - Sammle Daten für Personal AI")
         
         # Initialisiere AI Provider wenn gewünscht
         if self.use_ai:
@@ -186,7 +193,8 @@ class AdonisBot:
             "/myid - Deine User-ID (für Admin-Setup)\n\n"
             
             "**🔒 Admin-Befehle:**\n"
-            "/shutdown - Bot herunterfahren (nur Admin)\n\n"
+            "/shutdown - Bot herunterfahren (nur Admin)\n"
+            "/stats - Training Dataset Statistiken (nur Admin)\n\n"
             
             "**📅 Kalender-Befehle:**\n"
             "/today - Heutige Termine anzeigen\n"
@@ -319,6 +327,65 @@ class AdonisBot:
         )
         update.message.reply_text(myid_text, parse_mode='Markdown')
         logger.info(f"MyID angefordert von User: {user_id} (@{username})")
+    
+    @admin_only
+    def stats_command(self, update: Update, context: CallbackContext) -> None:
+        """
+        Handler für den /stats Befehl - Zeigt Interaction Statistics (Admin only)
+        
+        Args:
+            update: Telegram Update Objekt
+            context: Callback Context
+        """
+        user = update.effective_user
+        
+        try:
+            # Hole Statistiken
+            stats = self.interaction_logger.get_statistics(user_id=user.id)
+            
+            # Format Statistiken
+            stats_text = (
+                f"📊 **Personal AI Statistics**\n\n"
+                f"🧠 **Training Dataset:**\n"
+                f"• Total Interaktionen: {stats['total_interactions']}\n"
+                f"• Trainierbare: {stats['trainable_interactions']}\n"
+                f"• Sensibel (ausgeschlossen): {stats['total_interactions'] - stats['trainable_interactions']}\n\n"
+                
+                f"📅 **Zeitraum:**\n"
+                f"• Von: {stats['date_range']['first'] or 'N/A'}\n"
+                f"• Bis: {stats['date_range']['last'] or 'N/A'}\n\n"
+                
+                f"🎯 **Aktionen:**\n"
+            )
+            
+            for action, count in sorted(stats['actions'].items(), key=lambda x: x[1], reverse=True):
+                stats_text += f"• {action}: {count}x\n"
+            
+            stats_text += (
+                f"\n💡 **Tipp:**\n"
+                f"Je mehr du den Bot nutzt, desto besser kann\n"
+                f"dein persönliches AI-Modell dich verstehen!\n\n"
+                f"Aktueller Fortschritt: "
+            )
+            
+            # Progress indicator
+            trainable = stats['trainable_interactions']
+            if trainable < 50:
+                stats_text += f"🟡 {trainable}/50 (Minimum für Training)"
+            elif trainable < 200:
+                stats_text += f"🟢 {trainable}/200 (Gut für Basis-Training)"
+            else:
+                stats_text += f"🚀 {trainable}+ (Excellent für Fine-tuning!)"
+            
+            update.message.reply_text(stats_text, parse_mode='Markdown')
+            logger.info(f"Stats angefordert von Admin: {user.id}")
+            
+        except Exception as e:
+            logger.error(f"Stats command error: {e}")
+            update.message.reply_text(
+                "❌ Fehler beim Laden der Statistiken.\n"
+                "Prüfe die Logs für Details."
+            )
     
     @admin_only
     def shutdown_command(self, update: Update, context: CallbackContext) -> None:
@@ -543,6 +610,15 @@ class AdonisBot:
                 # Speichere Bot-Antwort im Kontext
                 self.context_manager.add_message(user.id, 'assistant', response)
                 
+                # 🧠 LOG INTERACTION - Für Personal AI Training
+                self._log_interaction(
+                    user=user,
+                    user_input=message_text,
+                    bot_output=response,
+                    bot_action='ai_response',
+                    chat_history=chat_history
+                )
+                
                 # Verarbeite KI-Response
                 self._process_ai_response(update, message_text, response)
                 return
@@ -758,6 +834,53 @@ Analysiere JETZT die GESAMTE Konversation und antworte:"""
         
         update.message.reply_text(response, parse_mode='Markdown')
     
+    def _log_interaction(
+        self,
+        user,
+        user_input: str,
+        bot_output: str,
+        bot_action: Optional[str] = None,
+        chat_history: Optional[list] = None,
+        is_sensitive: bool = False
+    ) -> None:
+        """
+        Speichert eine Bot-Interaktion für Personal AI Training
+        
+        Args:
+            user: Telegram User Objekt
+            user_input: User-Nachricht
+            bot_output: Bot-Antwort
+            bot_action: Art der Aktion (create_event, answer_question, etc.)
+            chat_history: Vorherige Konversation
+            is_sensitive: Ob diese Nachricht sensibel ist (kein Training)
+        """
+        try:
+            # Context-Daten sammeln
+            context_data = {
+                'timestamp': datetime.now().isoformat(),
+                'weekday': datetime.now().strftime('%A'),
+                'hour': datetime.now().hour,
+                'has_calendar': self.calendar_provider is not None,
+                'has_ai': self.ai_provider is not None
+            }
+            
+            # Log to database
+            self.interaction_logger.log_interaction(
+                user_id=user.id,
+                user_input=user_input,
+                bot_output=bot_output,
+                username=user.username,
+                user_input_type='text',
+                bot_action=bot_action,
+                context_data=context_data,
+                conversation_history=chat_history,
+                is_sensitive=is_sensitive
+            )
+            
+        except Exception as e:
+            # Logging-Fehler sollen Bot nicht unterbrechen
+            logger.warning(f"⚠️ Interaction logging failed: {e}")
+    
     def error_handler(self, update: object, context: CallbackContext) -> None:
         """
         Handler für Fehler
@@ -790,6 +913,7 @@ Analysiere JETZT die GESAMTE Konversation und antworte:"""
         
         # Command Handler - Admin
         dispatcher.add_handler(CommandHandler("shutdown", self.shutdown_command))
+        dispatcher.add_handler(CommandHandler("stats", self.stats_command))
         
         # Command Handler - Calendar
         dispatcher.add_handler(CommandHandler("today", self.today_command))

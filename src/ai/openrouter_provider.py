@@ -105,24 +105,21 @@ class OpenRouterProvider(AIProvider):
                 logger.error(f"Response: {e.response.text}")
             raise Exception(f"API Fehler: {str(e)}")
     
-    async def generate_response(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def generate_response(self, prompt: str, context: Optional[str] = None) -> str:
         """
-        Generiert eine Antwort über OpenRouter
+        Generiert eine Antwort über OpenRouter (synchron)
         
         Args:
             prompt: User Input / Prompt
-            context: Optionaler Kontext (temperature, max_tokens, system_prompt)
+            context: Optionaler System-Prompt String
             
         Returns:
             Generierte Antwort
         """
         try:
-            # Kontext-Parameter
-            temperature = context.get('temperature', 0.7) if context else 0.7
-            max_tokens = context.get('max_tokens', 150) if context else 150
-            system_prompt = context.get('system_prompt', 
-                'Du bist AdonisAI, ein hilfreicher persönlicher Assistent.') if context else \
-                'Du bist AdonisAI, ein hilfreicher persönlicher Assistent.'
+            # System-Prompt
+            system_prompt = context if context else \
+                'Du bist AdonisAI, ein hilfreicher persönlicher Assistent auf Deutsch.'
             
             # Messages im OpenAI-Format
             messages = [
@@ -130,18 +127,8 @@ class OpenRouterProvider(AIProvider):
                 {"role": "user", "content": prompt}
             ]
             
-            # Füge Konversations-Historie hinzu wenn vorhanden
-            if context and 'history' in context:
-                history_messages = []
-                for msg in context['history']:
-                    history_messages.append({
-                        "role": msg.get('role', 'user'),
-                        "content": msg.get('content', '')
-                    })
-                messages = [messages[0]] + history_messages + [messages[1]]
-            
             logger.info(f"🤖 Generiere Antwort mit {self.model}...")
-            result = self._make_request(messages, temperature, max_tokens)
+            result = self._make_request(messages, temperature=0.8, max_tokens=500)
             
             # Parse Response
             if 'choices' in result and len(result['choices']) > 0:

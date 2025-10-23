@@ -2,30 +2,29 @@
 """
 Start-Skript für AdonisAI - Umgeht SSL-Verifizierungsprobleme
 """
+
+# CRITICAL: Import ssl_patch FIRST to patch SSL before telegram loads
+import ssl_patch
+
+# Patch telegram's vendored urllib3
 import ssl
-import urllib3
+import telegram.vendor.ptb_urllib3.urllib3 as telegram_urllib3
+from telegram.vendor.ptb_urllib3.urllib3.util import ssl_ as telegram_ssl_
 
-# SSL-Verifizierung deaktivieren
-ssl._create_default_https_context = ssl._create_unverified_context
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Disable warnings
+telegram_urllib3.disable_warnings()
 
-# Monkey-patch für requests
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.poolmanager import PoolManager
+# Patch SSL context creation in vendored urllib3
+_original_create_urllib3_context = telegram_ssl_.create_urllib3_context
 
-class SSLAdapter(HTTPAdapter):
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs['ssl_version'] = ssl.PROTOCOL_TLS
-        kwargs['cert_reqs'] = ssl.CERT_NONE
-        return super().init_poolmanager(*args, **kwargs)
+def patched_create_urllib3_context(*args, **kwargs):
+    """Create SSL context without certificate verification"""
+    ctx = _original_create_urllib3_context(*args, **kwargs)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
-# Patch requests Session
-_old_request = requests.Session.request
-def _new_request(self, *args, **kwargs):
-    kwargs.setdefault('verify', False)
-    return _old_request(self, *args, **kwargs)
-requests.Session.request = _new_request
+telegram_ssl_.create_urllib3_context = patched_create_urllib3_context
 
 # Jetzt main.py ausführen
 import src.main

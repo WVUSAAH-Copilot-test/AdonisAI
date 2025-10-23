@@ -229,49 +229,53 @@ def extract_event_title(text: str) -> Optional[str]:
     
     Filtert Command-Keywords und Zeit/Ort-Angaben raus
     """
-    # Entferne Command-Keywords
-    command_keywords = [
-        'erstelle', 'create', 'neuer', 'termin', 'meeting', 'event',
-        'mach', 'plane', 'einplanen'
+    import re
+    
+    # Pattern für typische Command-Strukturen
+    # "Trage für morgen 15 Uhr ein Termin mit Max ein"
+    # → Entferne "Trage...ein" und "für morgen 15 Uhr", behalte "Termin mit Max"
+    
+    text_lower = text.lower()
+    
+    # Entferne Präfixe wie "erstelle", "trage...ein", "mach"
+    prefix_patterns = [
+        r'^(erstelle|create|neuer?|mach|plane?|einplanen|trage?)\s+',
+        r'^(trage|füge)\s+(ein|hinzu)\s+',
     ]
+    for pattern in prefix_patterns:
+        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
     
+    # Entferne "für [Zeit]" oder "[Zeit]" Pattern
+    time_patterns = [
+        r'\b(für|am|auf)\s+(heute|morgen|übermorgen|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b',
+        r'\b(heute|morgen|übermorgen)\b',
+        r'\b\d{1,2}[:\.]\d{2}\s*(uhr)?\b',
+        r'\bum\s+\d{1,2}[:\.]\d{2}\b',
+        r'\bum\s+\d{1,2}\s+(uhr)?\b',
+        r'\b(in|bei|im)\s+\d+\s+(stunden?|minuten?|min|std)\b',
+    ]
+    for pattern in time_patterns:
+        text = re.sub(pattern, ' ', text, flags=re.IGNORECASE)
+    
+    # Entferne trailing "ein" (von "trage...ein")
+    text = re.sub(r'\s+ein\s*$', '', text, flags=re.IGNORECASE)
+    
+    # Bereinige und normalisiere Leerzeichen
+    text = ' '.join(text.split())
+    text = text.strip()
+    
+    # Wenn Text mit "Termin" oder "Meeting" startet, behalte es
+    # Entferne nur führende Artikel
+    text = re.sub(r'^(ein|eine|der|die|das)\s+', '', text, flags=re.IGNORECASE)
+    
+    # Begrenze auf max 8 Wörter
     words = text.split()
-    filtered_words = []
+    if len(words) > 8:
+        text = ' '.join(words[:8])
     
-    skip_next = False
-    for i, word in enumerate(words):
-        if skip_next:
-            skip_next = False
-            continue
-        
-        word_lower = word.lower()
-        
-        # Überspringe Command-Keywords
-        if word_lower in command_keywords:
-            continue
-        
-        # Überspringe Zeit-Keywords
-        if word_lower in ['morgen', 'heute', 'übermorgen', 'um', 'uhr', 'in', 'bei', 'im']:
-            continue
-        
-        # Überspringe Zahlen (wahrscheinlich Uhrzeit)
-        if word_lower.replace(':', '').replace('.', '').isdigit():
-            continue
-        
-        # Überspringe Zeiteinheiten
-        if any(unit in word_lower for unit in ['stunde', 'minute', 'min', 'std']):
-            continue
-        
-        filtered_words.append(word)
-        
-        # Stop bei max 6 Wörtern für Titel
-        if len(filtered_words) >= 6:
-            break
-    
-    if filtered_words:
-        title = ' '.join(filtered_words)
-        logger.info(f"Titel extrahiert: '{title}'")
-        return title
+    if text and len(text) > 2:
+        logger.info(f"Titel extrahiert: '{text}' (Original: '{text_lower[:50]}')")
+        return text
     
     return None
 

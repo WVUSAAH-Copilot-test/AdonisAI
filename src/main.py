@@ -130,6 +130,8 @@ def main() -> None:
         
     except Exception as e:
         logger.error(f"❌ Fehler beim Starten des Bots: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         sys.exit(1)
     
     finally:

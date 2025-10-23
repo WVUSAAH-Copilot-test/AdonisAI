@@ -24,6 +24,9 @@ from src.utils.nlp_utils import detect_command_type, parse_event_from_text
 # Calendar Integration
 from src.gcalendar.factory import create_calendar_provider
 
+# Context Management
+from src.utils.context_manager import ContextManager
+
 # Logging konfigurieren
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -52,6 +55,9 @@ class AdonisBot:
         self.use_calendar = use_calendar
         self.ai_provider = None
         self.calendar_provider = None
+        
+        # Context Manager für Chat-Historie
+        self.context_manager = ContextManager(max_messages=10, ttl_minutes=30)
         
         # Initialisiere AI Provider wenn gewünscht
         if self.use_ai:
@@ -106,7 +112,8 @@ class AdonisBot:
             "📋 *Allgemein:*\n"
             "/start - Bot starten\n"
             "/help - Hilfe anzeigen\n"
-            "/info - Bot-Informationen\n\n"
+            "/info - Bot-Informationen\n"
+            "/features - Alle Funktionen im Detail\n\n"
             "📅 *Kalender:*\n"
             "/today - Termine heute\n"
             "/tomorrow - Termine morgen\n"
@@ -114,7 +121,8 @@ class AdonisBot:
             "/next - Nächster Termin\n\n"
             "💬 *Natürliche Sprache:*\n"
             "Sag einfach: 'Termin morgen 15 Uhr Meeting'\n"
-            "Oder: 'Was habe ich heute?'"
+            "Oder: 'Was habe ich heute?'\n\n"
+            "Tippe /features für die komplette Übersicht! 🚀"
         )
         update.message.reply_text(welcome_message, parse_mode='Markdown')
         logger.info(f"Bot gestartet von User: {user.id} ({user.username})")
@@ -129,16 +137,31 @@ class AdonisBot:
         """
         help_text = (
             "**AdonisAI - Hilfe** 📚\n\n"
-            "**Grundlegende Befehle:**\n"
-            "/start - Bot starten\n"
+            "**📋 Allgemeine Befehle:**\n"
+            "/start - Bot starten und Übersicht\n"
             "/help - Diese Hilfe anzeigen\n"
-            "/info - Bot-Informationen\n\n"
-            "**Kommende Features:**\n"
-            "📅 Kalender-Verwaltung (Google Calendar)\n"
-            "🎤 Sprachnachrichten verstehen\n"
-            "🔊 Sprachausgabe\n"
-            "🧠 KI-gestützte Antworten\n\n"
-            "Sende mir einfach eine Textnachricht und ich antworte dir!"
+            "/info - Bot-Informationen & Version\n"
+            "/features - Alle Funktionen im Detail\n\n"
+            
+            "**📅 Kalender-Befehle:**\n"
+            "/today - Heutige Termine anzeigen\n"
+            "/tomorrow - Morgige Termine anzeigen\n"
+            "/week - Termine dieser Woche\n"
+            "/next - Nächster anstehender Termin\n\n"
+            
+            "**� Natürliche Sprache:**\n"
+            "Du kannst auch einfach schreiben:\n"
+            "• 'Termin morgen 15 Uhr Meeting mit Team'\n"
+            "• 'Was habe ich heute?'\n"
+            "• 'Wann ist mein nächster Termin?'\n\n"
+            
+            "**🤖 KI-Chat:**\n"
+            "Stelle mir Fragen und ich antworte mit KI:\n"
+            "• 'Wie wird das Wetter?'\n"
+            "• 'Erkläre mir Quantenphysik'\n"
+            "• 'Schreibe einen Brief an...'\n\n"
+            
+            "Für mehr Details: /features"
         )
         update.message.reply_text(help_text, parse_mode='Markdown')
         logger.info(f"Hilfe angefordert von User: {update.effective_user.id}")
@@ -156,15 +179,75 @@ class AdonisBot:
             "Ein kostenloser, Open-Source KI-Assistent.\n\n"
             "**Features:**\n"
             "✅ Telegram Integration\n"
-            "🚧 KI-Modelle (in Entwicklung)\n"
-            "🚧 Google Calendar (in Entwicklung)\n"
+            "✅ KI-Modelle (OpenRouter + HuggingFace)\n"
+            "✅ Calendar Management (Google/iCloud/Mock)\n"
+            "✅ Natürliche Sprachverarbeitung (Deutsch)\n"
             "🚧 Sprachverarbeitung (in Entwicklung)\n\n"
-            "**GitHub:** https://github.com/wvusaah/AdonisAI\n"
+            "**GitHub:** https://github.com/WVUSAAH-Copilot-test/AdonisAI\n"
             "**Lizenz:** MIT\n\n"
-            "Made with ❤️ by the AdonisAI Community"
+            "Made with ❤️ by WVUSAAH"
         )
         update.message.reply_text(info_text, parse_mode='Markdown')
         logger.info(f"Info angefordert von User: {update.effective_user.id}")
+    
+    def features_command(self, update: Update, context: CallbackContext) -> None:
+        """
+        Handler für den /features Befehl - Detaillierte Funktionsübersicht
+        
+        Args:
+            update: Telegram Update Objekt
+            context: Callback Context
+        """
+        calendar_status = "✅ Aktiv" if self.calendar_provider else "❌ Inaktiv"
+        ai_status = "✅ Aktiv" if self.ai_provider else "❌ Inaktiv"
+        
+        features_text = (
+            "**AdonisAI - Alle Funktionen** 🚀\n\n"
+            
+            "**📅 KALENDER-MANAGEMENT** " + calendar_status + "\n"
+            "• Termine anzeigen (heute/morgen/Woche)\n"
+            "• Termine erstellen per Kommando oder Text\n"
+            "• Natürliche Sprache verstehen:\n"
+            "  'Termin morgen 15 Uhr Meeting'\n"
+            "• Automatische Konflikt-Erkennung\n"
+            "• Deutsche Datumsangaben:\n"
+            "  heute, morgen, übermorgen, Montag...\n"
+            "• Support für Google Calendar, iCloud, Mock\n\n"
+            
+            "**🤖 KI-ASSISTENT** " + ai_status + "\n"
+            "• Intelligente Chat-Antworten\n"
+            "• Zwei KI-Provider:\n"
+            "  - OpenRouter (GPT-3.5-Turbo)\n"
+            "  - HuggingFace (Open-Source Modelle)\n"
+            "• Kontextverständnis\n"
+            "• Deutsche Sprachunterstützung\n\n"
+            
+            "**💬 NATÜRLICHE SPRACHE**\n"
+            "• Erkennt Absichten (Termin/Frage/etc.)\n"
+            "• Extrahiert Datum, Zeit, Ort\n"
+            "• Deutsche Zeitausdrücke:\n"
+            "  'morgen um 15 Uhr'\n"
+            "  'nächsten Montag'\n"
+            "  'in 2 Stunden'\n\n"
+            
+            "**🔐 PRIVACY & SICHERHEIT**\n"
+            "• Lokale Datenverarbeitung\n"
+            "• Keine Daten an Dritte (außer gewählte KI)\n"
+            "• Open Source & Transparent\n"
+            "• SSL-verschlüsselte Kommunikation\n\n"
+            
+            "**🚧 IN ENTWICKLUNG**\n"
+            "• Siri Shortcuts Integration\n"
+            "• Sprachnachrichten verstehen\n"
+            "• Sprachausgabe (TTS)\n"
+            "• Erinnerungen & Notifications\n"
+            "• Multi-User Support\n\n"
+            
+            "**❓ Fragen?**\n"
+            "Schreib einfach eine Nachricht oder nutze /help"
+        )
+        update.message.reply_text(features_text, parse_mode='Markdown')
+        logger.info(f"Features angefordert von User: {update.effective_user.id}")
     
     def today_command(self, update: Update, context: CallbackContext) -> None:
         """Handler für /today - Zeigt heutige Termine"""
@@ -330,7 +413,7 @@ class AdonisBot:
     
     def handle_message(self, update: Update, context: CallbackContext) -> None:
         """
-        Handler für Text-Nachrichten
+        Handler für Textnachrichten - KI-basiert mit Kontext
         
         Args:
             update: Telegram Update Objekt
@@ -339,27 +422,159 @@ class AdonisBot:
         user = update.effective_user
         message_text = update.message.text
         
-        logger.info(f"Nachricht von {user.id} ({user.username}): {message_text}")
+        logger.info(f"Nachricht von {user.id}: {message_text}")
         
-        # Prüfe ob es ein Calendar-Command ist
+        # Speichere User-Nachricht im Kontext
+        self.context_manager.add_message(user.id, 'user', message_text)
+        
+        # Wenn KI verfügbar: Lass KI die Anfrage analysieren und verarbeiten
+        if self.ai_provider:
+            try:
+                # Hole Chat-Historie
+                chat_history = self.context_manager.get_context(user.id)
+                
+                # Erstelle einen Kontext-Prompt für die KI
+                system_prompt = self._build_system_prompt(message_text, chat_history)
+                
+                # KI analysiert die Anfrage MIT Kontext
+                response = self.ai_provider.generate_response(
+                    message_text,
+                    context=system_prompt
+                )
+                
+                # Speichere Bot-Antwort im Kontext
+                self.context_manager.add_message(user.id, 'assistant', response)
+                
+                # Verarbeite KI-Response
+                self._process_ai_response(update, message_text, response)
+                return
+                
+            except Exception as e:
+                logger.error(f"KI-Fehler: {e}")
+                # Fallback zu alter Logik
+        
+        # Fallback ohne KI (alte Logik)
         command_type = detect_command_type(message_text)
         
         if command_type == 'calendar' and self.calendar_provider:
             self._handle_calendar_message(update, message_text)
-            return
-        
-        # Versuche AI-Antwort zu generieren
-        if self.ai_provider:
-            try:
-                response = self.ai_provider.generate_response(message_text)
-                update.message.reply_text(response)
-            except Exception as e:
-                logger.error(f"AI Provider Fehler: {e}")
-                # Fallback zu Echo-Modus
-                update.message.reply_text(f"Echo: {message_text}")
         else:
-            # Echo-Modus wenn kein AI Provider
             update.message.reply_text(f"Echo: {message_text}")
+    
+    def _build_system_prompt(self, user_message: str, chat_history: list) -> str:
+        """
+        Erstellt System-Prompt für KI basierend auf verfügbaren Features und Chat-Historie
+        
+        Args:
+            user_message: User-Nachricht
+            chat_history: Liste von vorherigen Nachrichten
+            
+        Returns:
+            System-Prompt String
+        """
+        calendar_status = "verfügbar" if self.calendar_provider else "nicht verfügbar"
+        
+        # Erstelle Kontext-Zusammenfassung aus Historie
+        history_context = ""
+        if len(chat_history) > 1:  # Mehr als nur aktuelle Nachricht
+            history_context = "\n\n📝 VORHERIGE KONVERSATION (WICHTIG - LIES GENAU!):\n"
+            for msg in chat_history[-8:-1]:  # Letzte 7 Nachrichten (ohne aktuelle)
+                role = "👤 User" if msg['role'] == 'user' else "🤖 Du"
+                history_context += f"{role}: {msg['content']}\n"
+            history_context += "\n⚠️ WICHTIG: Berücksichtige ALLE Informationen aus dieser Historie für deine Antwort!\n"
+        
+        prompt = f"""Du bist AdonisAI, ein intelligenter persönlicher Assistent.
+
+KALENDER-MANAGEMENT: {calendar_status}
+
+KRITISCHE REGEL - KONTEXT VERSTEHEN:
+Du MUSST die vorherige Konversation VOLLSTÄNDIG lesen und verstehen!
+- Wenn User "Mittwoch" sagt und vorher "nächste Woche" erwähnte → MERKE: nächsten Mittwoch!
+- Wenn User einen Namen erwähnt (z.B. "Kunde Max") → MERKE den Namen für später!
+- Wenn User "die genannten Tage prüfen" sagt → Schau was vorher genannt wurde!
+- Kombiniere ALLE Informationen aus der Historie zu einem vollständigen Bild!
+{history_context}
+TERMIN-ERSTELLUNG REGELN:
+1. Erstelle NUR einen Termin bei EXPLIZITER Aufforderung mit komplettem Datum/Zeit
+2. Bei unvollständigen Infos → Stelle GEZIELTE Fragen
+3. Bei Termin-Erstellung → Nutze ALLE Infos aus der Konversation (Namen, Kontext, etc.)
+
+WENN User einen Termin erstellen möchte (mit vollständigen Infos):
+Kombiniere ALLE Informationen aus der Konversation:
+- Datum/Zeit aus aktueller ODER früherer Nachricht
+- Namen/Beschreibung aus früheren Nachrichten
+- Erstelle vollständigen Text der ALLE Details enthält
+
+Dann antworte:
+{{"action": "create_event", "text": "Termin [vollständiges Datum] [Uhrzeit] mit [Name/Details aus Historie]"}}
+
+BEISPIEL mit Historie:
+User1: "Kunde Max möchte nächste Woche Montag oder Mittwoch"
+Du: "Welcher Tag passt besser?"
+User2: "Mittwoch"
+Du: "Welche Uhrzeit?"
+User3: "14 Uhr"
+→ {{"action": "create_event", "text": "Termin nächsten Mittwoch 14 Uhr mit Kunde Max"}}
+(NICHT nur "Termin Mittwoch 14 Uhr" - sondern MIT Name aus User1!)
+
+WENN User Termine sehen will:
+{{"action": "list_events", "timeframe": "today|tomorrow|week"}}
+
+SONST: Antworte hilfreich, aber KURZ und PRÄZISE!
+
+Aktuelle User-Nachricht: "{user_message}"
+
+Analysiere JETZT die GESAMTE Konversation und antworte:"""
+        
+        return prompt
+    
+    def _process_ai_response(self, update: Update, original_message: str, ai_response: str) -> None:
+        """
+        Verarbeitet KI-Response und führt entsprechende Aktionen aus
+        
+        Args:
+            update: Telegram Update
+            original_message: Original User-Nachricht
+            ai_response: KI-Antwort
+        """
+        import json
+        import re
+        
+        # Versuche JSON-Action zu extrahieren
+        json_match = re.search(r'\{[^}]+\}', ai_response)
+        
+        if json_match:
+            try:
+                action_data = json.loads(json_match.group(0))
+                action = action_data.get('action')
+                
+                if action == 'create_event' and self.calendar_provider:
+                    # Erstelle Termin
+                    self._handle_calendar_message(update, original_message)
+                    return
+                
+                elif action == 'list_events' and self.calendar_provider:
+                    # Liste Termine
+                    timeframe = action_data.get('timeframe', 'today')
+                    
+                    if timeframe == 'today':
+                        self.today_command(update, None)
+                    elif timeframe == 'tomorrow':
+                        self.tomorrow_command(update, None)
+                    elif timeframe == 'week':
+                        self.week_command(update, None)
+                    return
+                
+                elif action == 'next_event' and self.calendar_provider:
+                    # Zeige nächsten Termin
+                    self.next_command(update, None)
+                    return
+                    
+            except json.JSONDecodeError:
+                pass  # Kein valides JSON, fahre mit normaler Antwort fort
+        
+        # Normale Text-Antwort
+        update.message.reply_text(ai_response)
     
     def _handle_calendar_message(self, update: Update, message_text: str) -> None:
         """
@@ -472,6 +687,7 @@ class AdonisBot:
         dispatcher.add_handler(CommandHandler("start", self.start_command))
         dispatcher.add_handler(CommandHandler("help", self.help_command))
         dispatcher.add_handler(CommandHandler("info", self.info_command))
+        dispatcher.add_handler(CommandHandler("features", self.features_command))
         
         # Command Handler - Calendar
         dispatcher.add_handler(CommandHandler("today", self.today_command))
@@ -498,16 +714,30 @@ class AdonisBot:
         """
         Startet den Bot im Polling-Modus
         """
-        # Updater erstellen
-        self.updater = Updater(token=self.token, use_context=True)
+        # Updater mit erweiterten Timeouts erstellen (für Corporate Networks)
+        logger.info("🔌 Verbinde mit Telegram API...")
+        self.updater = Updater(
+            token=self.token, 
+            use_context=True,
+            request_kwargs={
+                'read_timeout': 10,
+                'connect_timeout': 10
+            }
+        )
         
         # Handler registrieren
         self.setup_handlers()
         
         # Bot starten
         logger.info("🤖 AdonisAI Bot wird gestartet...")
-        self.updater.start_polling()
-        self.updater.idle()
+        try:
+            self.updater.start_polling(timeout=10)
+            logger.info("✅ Bot läuft und wartet auf Nachrichten!")
+            logger.info("📱 Öffne Telegram und sende /start an deinen Bot")
+            self.updater.idle()
+        except Exception as e:
+            logger.error(f"❌ Fehler beim Polling: {e}")
+            raise
 
 
 def create_bot(token: str) -> AdonisBot:

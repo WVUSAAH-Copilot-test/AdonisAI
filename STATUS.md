@@ -1,8 +1,8 @@
 # AdonisAI - Entwicklungsstatus
 
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Datum:** 22. Oktober 2025  
-**Letzter Commit:** acc9310
+**Letzter Commit:** f843636 (Phase 2) → Phase 3.1-3.2 (uncommitted)
 
 ---
 
@@ -13,7 +13,8 @@
 | **Phase 0** | ✅ Abgeschlossen | Vorbereitung & Setup | Projekt-Repo, Python-Umgebung, Git |
 | **Phase 1** | ✅ Abgeschlossen | Minimaler Telegram Bot | Text-Handler, Commands, Logging |
 | **Phase 2** | ✅ Abgeschlossen | LLM-Adapter Integration | HF/OpenRouter implementiert & getestet |
-| **Phase 3** | 📋 Geplant | Google Calendar | OAuth & Event-Management |
+| **Phase 3.1-3.2** | ⚠️ Code fertig | iCloud Calendar (CalDAV) | **BLOCKIERT durch Corporate Network** |
+| **Phase 3.3-3.6** | 📋 Geplant | Calendar Bot Integration | NLP, Commands, Service Layer, Tests |
 | **Phase 4** | 📋 Geplant | Speech (STT/TTS) | Vosk/Whisper + gTTS |
 | **Phase 5** | 📋 Geplant | Context & Intents | NLU & Session-Storage |
 | **Phase 6** | 📋 Geplant | Deployment & Extras | Replit/Render, Siri Shortcuts |
@@ -47,7 +48,7 @@
   - Command-Type Detection (calendar, reminder, question)
   - Fallback zu Echo-Modus bei Fehler
 
-### AI-Integration (✨ NEU in Phase 2)
+### AI-Integration (✨ Phase 2)
 - [x] Hugging Face Provider vollständig implementiert
 - [x] OpenRouter Provider vollständig implementiert
 - [x] Intelligente Antwort-Generierung
@@ -56,6 +57,37 @@
 - [x] Fehlerbehandlung & Fallbacks
 - [x] Test-Suite für AI-Provider
 - [x] SSL-Workarounds integriert
+
+### Calendar Integration (✨ Phase 3.1-3.2) ⚠️ BLOCKIERT
+
+- [x] **Abstract Calendar Base Class** (`CalendarClient`)
+  - Einheitliche Schnittstelle für alle Provider
+  - CRUD-Operationen (Create, Read, Update, Delete)
+  - `check_conflicts()` für Überschneidungs-Prüfung
+  
+- [x] **iCloud CalDAV Provider** (`iCloudCalendarProvider`)
+  - CalDAV-Client mit SSL-Workaround
+  - iCalendar-Format-Parsing
+  - Recurring Events Support
+  - Vollständige CRUD-Implementierung
+  
+- [x] **Credentials konfiguriert**
+  - iCloud Email: `sahelahmadzai11@gmail.com`
+  - App-spezifisches Passwort gesetzt ✅
+  - CalDAV URL: `https://caldav.icloud.com/`
+  
+- [x] **Dependencies installiert**
+  - `caldav==1.6.0`
+  - `icalendar==4.1.1`
+  - `recurring-ical-events==2.0.2`
+
+**⚠️ STATUS:** Code funktioniert, aber **Zscaler Firewall blockiert iCloud CalDAV** im Corporate Network  
+→ Siehe [docs/ICLOUD_BLOCKED.md](docs/ICLOUD_BLOCKED.md) für Details
+
+**Lösungen:**
+1. IT-Freigabe für `caldav.icloud.com` beantragen (empfohlen)
+2. Tests außerhalb Corporate Network (zu Hause / Mobile Hotspot)
+3. Alternative: Google Calendar API (funktioniert im Corporate Network)
 
 ### Projekt-Setup
 - [x] Vollständige Verzeichnisstruktur
@@ -68,7 +100,7 @@
 
 ### Module (Skelett vorhanden)
 - [x] `src/ai/` - AI Provider Interface
-- [x] `src/gcalendar/` - Calendar Client
+- [x] `src/gcalendar/` - Calendar Client (Abstract + iCloud)
 - [x] `src/utils/nlp_utils.py` - NLP Helpers
 - [x] `src/bot/` - Telegram Bot Logic
 
@@ -76,7 +108,31 @@
 
 ## ⚠️ Bekannte Probleme
 
-### SSL-Zertifikat-Fehler
+### 1. iCloud CalDAV blockiert (NEU ⚠️)
+**Problem:** Zugriff auf iCloud Calendar wird durch Corporate Firewall blockiert
+```
+Not allowed to upload files to this site
+iCloud - Blocked by Zscaler (Raiffeisen Bank International AG)
+```
+
+**Ursache:** Zscaler Security Policy blockiert CalDAV/WebDAV-Protokolle
+
+**Lösungen:**
+1. **IT-Freigabe beantragen** (empfohlen)
+   - Domain: `caldav.icloud.com`
+   - Verwendungszweck: Kalender-Synchronisation für persönlichen Produktivitäts-Bot
+2. **Code außerhalb Corporate Network testen**
+   - Zu Hause via privates WiFi
+   - Mobile Hotspot
+3. **Alternative Provider: Google Calendar API**
+   - OAuth2-Authentifizierung
+   - Funktioniert im Corporate Network
+   - Code ist dank Abstract Base Class leicht anpassbar
+
+**Dokumentation:** [docs/ICLOUD_BLOCKED.md](docs/ICLOUD_BLOCKED.md)  
+**Status:** Infrastructure-Problem, nicht Code-bedingt
+
+### 2. SSL-Zertifikat-Fehler
 **Problem:** Bot kann in Firmennetzwerken nicht starten
 ```
 urllib3 HTTPError [SSL: CERTIFICATE_VERIFY_FAILED]
@@ -93,7 +149,8 @@ urllib3 HTTPError [SSL: CERTIFICATE_VERIFY_FAILED]
    ```
 3. Alternative: Webhook-Modus statt Polling (später)
 
-**Status:** Infrastruktur-Problem, nicht Code-bedingt
+**Dokumentation:** [docs/SSL_PROBLEM.md](docs/SSL_PROBLEM.md)  
+**Status:** Infrastructure-Problem, nicht Code-bedingt
 
 ---
 

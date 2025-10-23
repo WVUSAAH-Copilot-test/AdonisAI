@@ -18,6 +18,17 @@ dateparser
 # Database & Storage
 sqlite-utils
 
+# Calendar Integration
+caldav==1.6.0
+icalendar==4.1.1
+recurring-ical-events==2.0.2
+
+# Google Calendar
+google-auth==2.16.0
+google-auth-oauthlib==0.8.0
+google-auth-httplib2==0.1.0
+google-api-python-client==2.70.0
+
 # Speech-to-Text (optional - install wenn benötigt)
 # vosk==0.3.45
 
